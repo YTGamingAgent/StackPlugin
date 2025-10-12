@@ -3,7 +3,6 @@ package net.stacking.simpleStacker;
 import net.stacking.simpleStacker.commands.StackCommand;
 import net.stacking.simpleStacker.handlers.ItemHandler;
 import net.stacking.simpleStacker.listeners.DurabilityUsageListener;
-import net.stacking.simpleStacker.listeners.StackingListener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Objects;
@@ -24,13 +23,10 @@ public class SimpleStacker extends JavaPlugin {
         itemHandler = new ItemHandler();
         itemHandler.loadStackSizes();
 
-        // Register listener to apply max stack size on stacks
-        getServer().getPluginManager().registerEvents(
-                new StackingListener(itemHandler.getTargets()),
-                this
-        );
+        // REMOVED: StackingListener (no auto-stacking!)
+        // Items will only stack when /stack command is used
 
-        // NEW: Register listener to prevent using stacked damageable items
+        // Register listener to prevent using stacked damageable items
         getServer().getPluginManager().registerEvents(
                 new DurabilityUsageListener(),
                 this
@@ -40,8 +36,9 @@ public class SimpleStacker extends JavaPlugin {
         Objects.requireNonNull(getCommand("stack"), "Command 'stack' not found in plugin.yml")
                 .setExecutor(new StackCommand(this));
 
-        getLogger().info("SimpleStacker is enabled (SAFE MODE - Durability stacking enabled).");
-        getLogger().info("Rules loaded: " + itemHandler.getTargets().size());
+        getLogger().info("SimpleStacker enabled - Manual stacking only mode!");
+        getLogger().info("Stack rules loaded: " + itemHandler.getTargets().size());
+        getLogger().info("Use /stack command to stack items (no auto-stacking)");
     }
 
     @Override

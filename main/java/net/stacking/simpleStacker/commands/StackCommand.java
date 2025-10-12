@@ -52,7 +52,16 @@ public class StackCommand implements CommandExecutor {
 
     /**
      * SAFE STACKING METHOD - NEVER CLEARS INVENTORY
-     * Now supports stacking damageable items with same durability!
+     * NOW EXCLUDES EQUIPPED ARMOR AND OFFHAND!
+     *
+     * PlayerInventory slots:
+     * 0-8: Hotbar
+     * 9-35: Main inventory
+     * 36: Boots
+     * 37: Leggings
+     * 38: Chestplate
+     * 39: Helmet
+     * 40: Offhand
      */
     private int stackInventorySafe(Player player) {
         PlayerInventory inventory = player.getInventory();
@@ -62,16 +71,16 @@ public class StackCommand implements CommandExecutor {
         int stackedGroups = 0;
 
         try {
-            // First pass: Apply max stack size metadata to all applicable items
-            for (int i = 0; i < inventory.getSize(); i++) {
+            // First pass: Apply max stack size metadata ONLY to items in main inventory (0-35)
+            for (int i = 0; i <= 35; i++) { // CHANGED: Only slots 0-35 (excludes armor + offhand)
                 ItemStack item = inventory.getItem(i);
                 if (item != null && item.getType() != Material.AIR) {
                     applyMaxStackSize(item, targets);
                 }
             }
 
-            // Second pass: Stack similar items together (in-place, no clearing)
-            for (int i = 0; i < inventory.getSize(); i++) {
+            // Second pass: Stack similar items together (ONLY main inventory)
+            for (int i = 0; i <= 35; i++) { // CHANGED: Only slots 0-35
                 ItemStack item = inventory.getItem(i);
                 if (item == null || item.getType() == Material.AIR) continue;
 
@@ -80,12 +89,12 @@ public class StackCommand implements CommandExecutor {
                 // If this stack is already full, skip it
                 if (item.getAmount() >= targetMax) continue;
 
-                // Look for similar items in later slots to combine
-                for (int j = i + 1; j < inventory.getSize(); j++) {
+                // Look for similar items in later slots to combine (ONLY in main inventory)
+                for (int j = i + 1; j <= 35; j++) { // CHANGED: Only slots 0-35
                     ItemStack otherItem = inventory.getItem(j);
                     if (otherItem == null || otherItem.getType() == Material.AIR) continue;
 
-                    // Check if items can stack (includes durability check now!)
+                    // Check if items can stack (includes durability check!)
                     if (!canStack(item, otherItem)) continue;
 
                     // Calculate how much we can transfer
@@ -111,6 +120,7 @@ public class StackCommand implements CommandExecutor {
 
         } catch (Exception e) {
             plugin.getLogger().severe("Error during safe stacking for player " + player.getName() + ": " + e.getMessage());
+            e.printStackTrace();
             player.sendMessage(ChatColor.RED + "An error occurred while stacking. Your items are safe!");
             return 0;
         }
