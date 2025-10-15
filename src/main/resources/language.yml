@@ -1,0 +1,32 @@
+# SimpleStacker language config.
+# Use & for color codes (e.g., &a = green, &c = red)
+# Use {0}, {1}, etc. for placeholder values
+
+# Command Messages
+command:
+  players-only: "&cThis command can only be used by players!"
+  no-permission: "&d&lYou don't have permission to use this command!"
+
+  # /stack command
+  stack-success: "&d&l✓ &dSuccessfully stacked {0} item group(s)!"
+  stack-none: "&d&l✗ &dNo items to stack!"
+  stack-error: "&cAn error occurred while stacking. Your items are safe!"
+
+  # /unstack command
+  unstack-success: "&d&l✓ &dSuccessfully unstacked {0} item(s)!"
+  unstack-none: "&d&l✗ &dNo stacked items found!"
+  unstack-error: "&cAn error occurred while unstacking. Your items are safe!"
+
+  # /stackreload command
+  reload-success: "&a&l✓ &aConfiguration reloaded successfully!"
+  reload-error: "&cAn error occurred while reloading configuration!"
+
+  # /stackshulkerinterior (/ssi) command
+  shulker-not-found: "&c&l✗ &cYou must be holding a shulker box in your main hand or offhand!"
+  shulker-stack-success: "&d&l✓ &dSuccessfully stacked {0} item group(s) inside shulker box!"
+  shulker-stack-none: "&d&l✗ &dNo items to stack inside shulker box!"
+  shulker-stack-error: "&cAn error occurred while stacking shulker contents!"
+
+# Listener Messages
+listener:
+  durability-usage: "&cYou must take one item out of the stack and use that!"

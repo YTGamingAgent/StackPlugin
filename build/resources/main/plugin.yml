@@ -12,7 +12,48 @@ commands:
     permission: simplestacker.use
     permission-message: "§d§lYou don't have permission to use this command!"
 
+  unstack:
+    description: Remove custom stack metadata from items in your inventory
+    usage: /unstack
+    permission: simplestacker.unstack
+    permission-message: "§d§lYou don't have permission to use this command!"
+
+  stackreload:
+    description: Reload plugin configuration
+    usage: /stackreload
+    aliases: [sreload]
+    permission: simplestacker.reload
+    permission-message: "§d§lYou don't have permission to use this command!"
+
+  stackshulkerinterior:
+    description: Stack items inside a shulker box you're holding
+    usage: /stackshulkerinterior
+    aliases: [ssi]
+    permission: simplestacker.stackshulker
+    permission-message: "§d§lYou don't have permission to use this command!"
+
 permissions:
   simplestacker.use:
     description: Allows players to use /stack command
     default: op
+
+  simplestacker.unstack:
+    description: Allows players to use /unstack command
+    default: op
+
+  simplestacker.reload:
+    description: Allows players to reload plugin configuration
+    default: op
+
+  simplestacker.stackshulker:
+    description: Allows players to stack items inside shulker boxes
+    default: op
+
+  simplestacker.*:
+    description: Grants access to all SimpleStacker commands
+    default: op
+    children:
+      simplestacker.use: true
+      simplestacker.unstack: true
+      simplestacker.reload: true
+      simplestacker.stackshulker: true

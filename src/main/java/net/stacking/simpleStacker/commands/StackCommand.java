@@ -2,6 +2,7 @@ package net.stacking.simpleStacker.commands;
 
 import net.stacking.simpleStacker.SimpleStacker;
 import net.stacking.simpleStacker.handlers.ItemHandler;
+import net.stacking.simpleStacker.handlers.LanguageManager;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.block.ShulkerBox;
@@ -9,220 +10,254 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.BlockStateMeta;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.NamespacedKey;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class StackCommand implements CommandExecutor {
 
     private final SimpleStacker plugin;
+    private final NamespacedKey stackedKey;
 
     public StackCommand(SimpleStacker plugin) {
         this.plugin = plugin;
+        this.stackedKey = new NamespacedKey(plugin, "stacked_item");
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        LanguageManager lang = plugin.getLanguageManager();
+
         if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "This command can only be used by players!");
+            sender.sendMessage(lang.getMessage("command.players-only"));
             return true;
         }
 
         Player player = (Player) sender;
 
         if (!player.hasPermission("simplestacker.use")) {
-            player.sendMessage(ChatColor.DARK_PURPLE + "" + ChatColor.BOLD + "You don't have permission to use this command!");
+            player.sendMessage(lang.getMessage("command.no-permission"));
             return true;
         }
 
-        int stackedCount = stackInventory(player);
+        int stackedCount = stackInventorySafe(player);
 
         if (stackedCount > 0) {
-            player.sendMessage(ChatColor.DARK_PURPLE + "" + ChatColor.BOLD + "✓ " + ChatColor.LIGHT_PURPLE + "Successfully stacked your items!");
+            player.sendMessage(lang.getMessage("command.stack-success", stackedCount));
         } else {
-            player.sendMessage(ChatColor.DARK_PURPLE + "" + ChatColor.BOLD + "✗ " + ChatColor.LIGHT_PURPLE + "No items to stack!");
+            player.sendMessage(lang.getMessage("command.stack-none"));
         }
 
         return true;
     }
 
-    private int stackInventory(Player player) {
+    /**
+     * Safe stacking method for ensuring inventory doesn't clear
+     * Excludes armor equipped and offhand stuff
+     */
+    private int stackInventorySafe(Player player) {
         PlayerInventory inventory = player.getInventory();
-        Map<String, ItemStackGroup> groups = new HashMap<>();
-        int stackedCount = 0;
-
-        // Build groups with strict key: material + exact name + exact lore [+ shulker color + normalized contents]
-        for (int i = 0; i < inventory.getSize(); i++) {
-            ItemStack item = inventory.getItem(i);
-            if (item == null || item.getType() == Material.AIR) continue;
-
-            String key = buildStrictKey(item);
-            groups.computeIfAbsent(key, k -> new ItemStackGroup(item)).addAmount(item.getAmount());
-        }
-
-        // Clear inventory
-        inventory.clear();
-
-        // Re-create stacks using configured per-material max, and write the max onto the new stacks
         ItemHandler handler = plugin.getItemHandler();
         Map<Material, Integer> targets = handler.getTargets();
+        int stackedGroups = 0;
 
-        for (ItemStackGroup group : groups.values()) {
-            ItemStack template = group.getTemplate();
-            int total = group.getTotalAmount();
+        try {
+            // First pass: Apply max stack size metadata only to items in main inventory (0-35)
+            for (int i = 0; i <= 35; i++) {
+                ItemStack item = inventory.getItem(i);
+                if (item != null && item.getType() != Material.AIR) {
+                    applyMaxStackSize(item, targets);
+                }
+            }
 
-            // Use configured target if present, else current stack max
-            int targetMax = targets.getOrDefault(template.getType(), template.getMaxStackSize());
-            // Clamp to 1..99 for safety
-            if (targetMax < 1) targetMax = 1;
-            if (targetMax > 99) targetMax = 99;
+            // Second pass: Stack similar items together (ONLY main inventory)
+            for (int i = 0; i <= 35; i++) {
+                ItemStack item = inventory.getItem(i);
 
-            while (total > 0) {
-                int stackSize = Math.min(total, targetMax);
-                ItemStack stack = template.clone();
-                stack.setAmount(stackSize);
+                if (item == null || item.getType() == Material.AIR) continue;
 
-                // Apply the MAX_STACK_SIZE component to this new stack explicitly
-                ItemMeta meta = stack.getItemMeta();
-                if (meta != null) {
-                    try {
-                        // Damageable items cannot have >1; targets skipped already, but keep safe:
-                        if (!(template.getType().getMaxDurability() > 0 && targetMax > 1)) {
-                            meta.setMaxStackSize(targetMax);
-                        }
-                        stack.setItemMeta(meta);
-                    } catch (Throwable ignored) {
-                        // If some meta rejects, just skip applying
+                int targetMax = getTargetMaxStack(item, targets);
+
+                // If this stack is already full, skip it
+                if (item.getAmount() >= targetMax) continue;
+
+                // Look for similar items in later slots to combine (ONLY in main inventory)
+                for (int j = i + 1; j <= 35; j++) {
+                    ItemStack otherItem = inventory.getItem(j);
+
+                    if (otherItem == null || otherItem.getType() == Material.AIR) continue;
+
+                    // Check if items can stack (includes durability check!)
+                    if (!canStack(item, otherItem)) continue;
+
+                    // Calculate how much we can transfer
+                    int spaceLeft = targetMax - item.getAmount();
+                    if (spaceLeft <= 0) break; // Current stack is 64
+
+                    int transferAmount = Math.min(spaceLeft, otherItem.getAmount());
+
+                    // Transfer items
+                    item.setAmount(item.getAmount() + transferAmount);
+                    otherItem.setAmount(otherItem.getAmount() - transferAmount);
+
+                    // If the other stack is now empty, remove it
+                    if (otherItem.getAmount() <= 0) {
+                        inventory.setItem(j, null);
                     }
-                }
 
-                // Add to inventory
-                HashMap<Integer, ItemStack> leftover = inventory.addItem(stack);
-                if (!leftover.isEmpty()) {
-                    // Drop if cannot fit
-                    player.getWorld().dropItem(player.getLocation(), leftover.values().iterator().next());
+                    stackedGroups++;
                 }
-
-                total -= stackSize;
-                stackedCount++;
             }
+
+            player.updateInventory();
+
+        } catch (Exception e) {
+            plugin.getLogger().severe("Error during safe stacking for player " + player.getName() + ": " + e.getMessage());
+            e.printStackTrace();
+            player.sendMessage(plugin.getLanguageManager().getMessage("command.stack-error"));
+            return 0;
         }
 
-        player.updateInventory();
-        return stackedCount;
+        return stackedGroups;
     }
 
-    // Strict key: material + exact display name + exact lore (legacy API only)
-    // If shulker: also require same color (type name) and contents signature (order-independent)
-    private String buildStrictKey(ItemStack item) {
-        if (item == null || item.getType() == Material.AIR) return "air";
+    /**
+     * Apply max stack size metadata to an item (now includes damageable items)
+     * Marks items with persistent data so they can be identified and cleaned up
+     */
+    private void applyMaxStackSize(ItemStack item, Map<Material, Integer> targets) {
+        if (item == null || item.getType() == Material.AIR) return;
 
-        StringBuilder key = new StringBuilder(item.getType().name());
+        Integer targetMax = targets.get(item.getType());
+        if (targetMax == null) return;
+
+        // Validate target
+        if (targetMax < 1 || targetMax > 99) return;
+
         ItemMeta meta = item.getItemMeta();
+        if (meta == null) return;
 
-        // Exact display name (legacy String)
-        String name = "";
-        if (meta != null && meta.hasDisplayName()) {
-            name = meta.getDisplayName();
-        }
-        key.append("|name=").append(name);
+        try {
+            // Apply max stack size (now works for damageable items too!)
+            if (!meta.hasMaxStackSize() || meta.getMaxStackSize() != targetMax) {
+                meta.setMaxStackSize(targetMax);
 
-        // Exact lore (legacy String list)
-        String loreSig = "";
-        if (meta != null && meta.hasLore()) {
-            List<String> lore = meta.getLore();
-            if (lore != null) {
-                loreSig = lore.toString();
+                // Mark this item as stacked by our plugin using PersistentDataContainer
+                meta.getPersistentDataContainer().set(stackedKey, PersistentDataType.BYTE, (byte) 1);
+
+                item.setItemMeta(meta);
             }
+        } catch (Exception e) {
+            // Silently fail for items that don't support max stack size
         }
-        key.append("|lore=").append(loreSig);
-
-        // Shulker-specific: color/type already in material name. Also include contents signature
-        if (isShulkerBox(item)) {
-            key.append("|shulker=").append(buildShulkerContentsSignature(item));
-        }
-
-        return key.toString();
     }
 
+    /**
+     * Get the target max stack size for an item
+     */
+    private int getTargetMaxStack(ItemStack item, Map<Material, Integer> targets) {
+        Integer target = targets.get(item.getType());
+        if (target != null && target >= 1 && target <= 99) {
+            return target;
+        }
+        return item.getMaxStackSize();
+    }
+
+    /**
+     * Check if two items can be stacked together
+     * Included durability checker this time for more simplicity
+     */
+    private boolean canStack(ItemStack item1, ItemStack item2) {
+        if (item1 == null || item2 == null) return false;
+        if (item1.getType() != item2.getType()) return false;
+        if (!item1.isSimilar(item2)) return false;
+
+        // NEW: Check durability - must be EXACTLY the same
+        if (!durabilityMatches(item1, item2)) return false;
+
+        // Additional check for shulker boxes
+        if (isShulkerBox(item1)) {
+            return shulkerContentsMatch(item1, item2);
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if two items have the exact same durability
+     */
+    private boolean durabilityMatches(ItemStack item1, ItemStack item2) {
+        ItemMeta meta1 = item1.getItemMeta();
+        ItemMeta meta2 = item2.getItemMeta();
+
+        // If neither has durability, they match
+        if (!(meta1 instanceof Damageable) && !(meta2 instanceof Damageable)) {
+            return true;
+        }
+
+        // If only one has durability, they don't match
+        if (!(meta1 instanceof Damageable) || !(meta2 instanceof Damageable)) {
+            return false;
+        }
+
+        // Both have durability - check if damage values are EXACTLY the same
+        Damageable dam1 = (Damageable) meta1;
+        Damageable dam2 = (Damageable) meta2;
+
+        return dam1.getDamage() == dam2.getDamage();
+    }
+
+    /**
+     * Check if an item is a shulker box
+     */
     private boolean isShulkerBox(ItemStack item) {
         if (item == null) return false;
-        String name = item.getType().name();
-        return name.endsWith("_SHULKER_BOX");
+        // Changed to contains() to catch both "SHULKER_BOX" and "COLOR_SHULKER_BOX"
+        return item.getType().name().contains("SHULKER_BOX");
     }
 
-    // Order-independent contents signature:
-    // Combine identical inner items (by material + name + lore) and sum their amounts; sort keys for stable signature.
-    private String buildShulkerContentsSignature(ItemStack shulkerItem) {
-        if (!(shulkerItem.getItemMeta() instanceof BlockStateMeta)) return "empty";
-        BlockStateMeta meta = (BlockStateMeta) shulkerItem.getItemMeta();
-        if (!(meta.getBlockState() instanceof ShulkerBox)) return "empty";
+    /**
+     * Check if two shulker boxes have identical contents
+     */
+    private boolean shulkerContentsMatch(ItemStack shulker1, ItemStack shulker2) {
+        try {
+            if (!(shulker1.getItemMeta() instanceof BlockStateMeta)) return true;
+            if (!(shulker2.getItemMeta() instanceof BlockStateMeta)) return true;
 
-        ShulkerBox shulker = (ShulkerBox) meta.getBlockState();
-        Map<String, Integer> contentCounts = new HashMap<>();
+            BlockStateMeta meta1 = (BlockStateMeta) shulker1.getItemMeta();
+            BlockStateMeta meta2 = (BlockStateMeta) shulker2.getItemMeta();
 
-        for (ItemStack content : shulker.getInventory().getContents()) {
-            if (content == null || content.getType() == Material.AIR) continue;
-            String innerKey = buildNonShulkerStrictKey(content);
-            contentCounts.merge(innerKey, content.getAmount(), Integer::sum);
-        }
+            if (!(meta1.getBlockState() instanceof ShulkerBox)) return true;
+            if (!(meta2.getBlockState() instanceof ShulkerBox)) return true;
 
-        List<String> parts = new ArrayList<>();
-        for (Map.Entry<String, Integer> e : contentCounts.entrySet()) {
-            parts.add(e.getKey() + "x" + e.getValue());
-        }
-        parts.sort(Comparator.naturalOrder());
+            ShulkerBox box1 = (ShulkerBox) meta1.getBlockState();
+            ShulkerBox box2 = (ShulkerBox) meta2.getBlockState();
 
-        return String.join(",", parts);
-    }
+            ItemStack[] contents1 = box1.getInventory().getContents();
+            ItemStack[] contents2 = box2.getInventory().getContents();
 
-    // Non-shulker strict key (material + exact name + exact lore) - legacy API only
-    private String buildNonShulkerStrictKey(ItemStack item) {
-        StringBuilder key = new StringBuilder(item.getType().name());
-        ItemMeta meta = item.getItemMeta();
+            if (contents1.length != contents2.length) return false;
 
-        String name = "";
-        if (meta != null && meta.hasDisplayName()) {
-            name = meta.getDisplayName();
-        }
-        key.append("|name=").append(name);
+            for (int i = 0; i < contents1.length; i++) {
+                ItemStack c1 = contents1[i];
+                ItemStack c2 = contents2[i];
 
-        String loreSig = "";
-        if (meta != null && meta.hasLore()) {
-            List<String> lore = meta.getLore();
-            if (lore != null) {
-                loreSig = lore.toString();
+                if (c1 == null && c2 == null) continue;
+                if (c1 == null || c2 == null) return false;
+                if (!c1.equals(c2)) return false;
             }
-        }
-        key.append("|lore=").append(loreSig);
 
-        return key.toString();
-    }
-
-    private static class ItemStackGroup {
-        private final ItemStack template;
-        private int totalAmount;
-
-        ItemStackGroup(ItemStack template) {
-            this.template = template.clone();
-            this.template.setAmount(1);
-            this.totalAmount = 0;
-        }
-
-        void addAmount(int amount) {
-            this.totalAmount += amount;
-        }
-
-        ItemStack getTemplate() {
-            return template;
-        }
-
-        int getTotalAmount() {
-            return totalAmount;
+            return true;
+        } catch (Exception e) {
+            // If we can't compare, assume they don't match to be safe
+            return false;
         }
     }
 }

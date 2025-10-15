@@ -1,5 +1,5 @@
 # SimpleStacker Configuration
-# EVERY item that normally stacks less than 64 is now 64!
+# Every item that normally stacks less than 64 is now 64, wanted to list them out
 
 items:
   # Food (normally 16)
