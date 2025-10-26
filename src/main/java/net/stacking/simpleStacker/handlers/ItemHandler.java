@@ -13,6 +13,8 @@ public class ItemHandler {
     private final Map<Material, Integer> targets = new HashMap<>();
 
     public void loadStackSizes() {
+        targets.clear(); // Clear existing entries before reloading
+
         Logger log = SimpleStacker.getInstance().getLogger();
         ConfigurationSection itemsSection = SimpleStacker.getInstance().getConfig().getConfigurationSection("items");
 
@@ -21,12 +23,12 @@ public class ItemHandler {
             return;
         }
 
-        int success = 0, skippedDamageable = 0, invalid = 0;
+        int success = 0, invalid = 0;
 
         for (String materialName : itemsSection.getKeys(false)) {
             int stackSize = itemsSection.getInt(materialName);
-
             Material material = Material.matchMaterial(materialName);
+
             if (material == null) {
                 log.fine("Unknown material (skipping): " + materialName);
                 invalid++;
@@ -39,17 +41,12 @@ public class ItemHandler {
                 continue;
             }
 
-            if (material.getMaxDurability() > 0 && stackSize > 1) {
-                log.fine("Skipping damageable item " + material + " with size " + stackSize + " (MAX_STACK_SIZE>1 conflicts with durability).");
-                skippedDamageable++;
-                continue;
-            }
-
+            // Removed durability check - now damageable items can stack
             targets.put(material, stackSize);
             success++;
         }
 
-        log.info("Loaded " + success + " stack rules, skipped " + skippedDamageable + " damageable, " + invalid + " invalid.");
+        log.info("Loaded " + success + " stack rules, " + invalid + " invalid.");
     }
 
     public Map<Material, Integer> getTargets() {
