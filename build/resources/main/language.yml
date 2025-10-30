@@ -1,0 +1,37 @@
+# SimpleStacker Language File
+# Use & for color codes (&c = red, &a = green, &e = yellow)
+# Use {0}, {1}, {2}, etc. for placeholders
+
+# Default message shown to players when a language key is missing
+# This prevents technical "Missing key: xyz" messages from being shown to players
+default-missing-key-message: "&cSomething went wrong. Please contact a server administrator."
+
+# Command messages
+command:
+  players-only: "&cThis command can only be used by players!"
+  no-permission: "&cYou don't have permission to use this command!"
+
+  # /stack command
+  stack-success: "&aSuccessfully stacked &e{0} &agroups of items!"
+  stack-none: "&eNo items to stack!"
+  stack-error: "&cAn error occurred while stacking items. Please try again."
+
+  # /unstack command
+  unstack-success: "&aSuccessfully unstacked &e{0} &aitems!"
+  unstack-none: "&eNo stacked items to unstack!"
+  unstack-error: "&cAn error occurred while unstacking items. Please try again."
+
+  # /stackreload command
+  reload-success: "&aSimpleStacker configuration reloaded successfully!"
+  reload-error: "&cFailed to reload configuration. Check console for errors."
+
+  # /stackshulkerinterior command (or /ssi)
+  shulker-not-found: "&cYou must be holding a shulker box in your main hand or offhand!"
+  shulker-stack-success: "&aSuccessfully stacked &e{0} &agroups inside the shulker box!"
+  shulker-stack-none: "&eNo items to stack inside the shulker box!"
+  shulker-stack-error: "&cAn error occurred while stacking shulker contents. Please try again."
+
+# General messages
+general:
+  plugin-enabled: "&aSimpleStacker has been enabled!"
+  plugin-disabled: "&cSimpleStacker has been disabled!"

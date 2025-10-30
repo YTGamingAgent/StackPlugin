@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'net.stacking'
-version = '1.0-SNAPSHOT'
+version = '2.7'
 description = 'Simple item stacker plugin for Paper 1.21.5'
 
 repositories {

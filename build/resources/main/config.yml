@@ -1,5 +1,5 @@
 # SimpleStacker Configuration
-# EVERY item that normally stacks less than 64 is now 64!
+# Every item that normally stacks less than 64 is now 64, wanted to list them out
 
 items:
   # Food (normally 16)
@@ -113,6 +113,25 @@ items:
   GREEN_SHULKER_BOX: 64
   RED_SHULKER_BOX: 64
   BLACK_SHULKER_BOX: 64
+
+  # Bundles (normally 1)
+  BUNDLE: 64
+  WHITE_BUNDLE: 64
+  ORANGE_BUNDLE: 64
+  MAGENTA_BUNDLE: 64
+  LIGHT_BLUE_BUNDLE: 64
+  YELLOW_BUNDLE: 64
+  LIME_BUNDLE: 64
+  PINK_BUNDLE: 64
+  GRAY_BUNDLE: 64
+  LIGHT_GRAY_BUNDLE: 64
+  CYAN_BUNDLE: 64
+  PURPLE_BUNDLE: 64
+  BLUE_BUNDLE: 64
+  BROWN_BUNDLE: 64
+  GREEN_BUNDLE: 64
+  RED_BUNDLE: 64
+  BLACK_BUNDLE: 64
 
   # Minecarts (normally 1)
   MINECART: 64
